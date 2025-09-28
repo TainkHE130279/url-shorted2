@@ -36,10 +36,11 @@ fi
 
 # 1. Format check (gofmt)
 print_status "Running gofmt check..."
-if ! gofmt -l . | grep -q .; then
+unformatted_files=$(gofmt -l .)
+if [ -n "$unformatted_files" ]; then
     print_error "Code is not properly formatted!"
     echo "Files that need formatting:"
-    gofmt -l .
+    echo "$unformatted_files"
     echo ""
     echo "Run 'gofmt -w .' to fix formatting issues"
     exit 1

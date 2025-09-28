@@ -20,6 +20,40 @@ Một URL Shortener service được xây dựng với Go và Clean Architecture
 - **Repository Pattern** - Data access abstraction
 - **Dependency Injection** - Loose coupling
 
+## 🔧 Development Setup
+
+### **Pre-commit Hooks**
+Dự án sử dụng pre-commit hooks để đảm bảo code quality:
+
+```bash
+# Setup pre-commit hooks (chỉ cần chạy 1 lần)
+make setup-hooks
+
+# Hoặc chạy manual
+./scripts/setup-hooks.sh
+```
+
+**Hooks sẽ tự động chạy khi commit:**
+- ✅ Code formatting (gofmt)
+- ✅ Code linting (golangci-lint)
+- ✅ Unit tests (go test)
+- ✅ Build check (go build)
+
+### **Makefile Commands**
+```bash
+make help          # Xem tất cả commands
+make dev-setup     # Setup development environment
+make test          # Chạy tests
+make lint          # Chạy linter
+make format        # Format code
+make build         # Build application
+make run           # Chạy application
+make docker-build  # Build Docker image
+make docker-run    # Chạy với Docker Compose
+```
+
+**Xem chi tiết:** [Pre-commit Guide](docs/PRE_COMMIT_GUIDE.md)
+
 ## ⚙️ Cấu hình ứng dụng
 
 ### **Environment Variables**
