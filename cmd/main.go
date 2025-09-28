@@ -19,10 +19,10 @@ import (
 func main() {
 	// Load configuration
 	cfg := config.LoadConfig()
-	
+
 	// Set Gin mode
 	gin.SetMode(cfg.Server.GinMode)
-	
+
 	// Khởi tạo Gin router
 	router := gin.New()
 
@@ -90,4 +90,3 @@ func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 
 	return db, nil
 }
-

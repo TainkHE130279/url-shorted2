@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # URL Shortener Application
+  url-shortener:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: url-shortener-app
+    ports:
+      - "8080:8080"
+    environment:
+      - GIN_MODE=release
+      - PORT=8080
+      - BASE_URL=http://localhost:8080
+      - DB_TYPE=sqlite
+      - DB_PATH=/app/data/url_shortener.db
+      - REDIS_URL=redis://redis:6379
+      - REDIS_POOL_SIZE=100
+      - REDIS_MIN_IDLE_CONNS=20
+      - REDIS_MAX_RETRIES=3
+      - REDIS_DIAL_TIMEOUT=5
+      - REDIS_READ_TIMEOUT=3
+      - REDIS_WRITE_TIMEOUT=3
+      - REDIS_POOL_TIMEOUT=4
+      - LOCK_MAX_TIME=30
+      - LOCK_MAX_TRY_TIME=10
+    volumes:
+      - url_shortener_data:/app/data
+    depends_on:
+      - redis
+    networks:
+      - url-shortener-network
+    restart: always
+
+  # Redis cho distributed locking
+  redis:
+    image: redis:7-alpine
+    container_name: url-shortener-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - url-shortener-network
+    #restart: restart-always
+
+volumes:
+  url_shortener_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  url-shortener-network:
+    driver: bridge

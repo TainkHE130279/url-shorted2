@@ -1,113 +1,207 @@
-# Go Gin Clean Architecture - URL Shortener API
+# URL Shortener API
 
-Đây là một bộ khung Go Gin đơn giản với API URL shortener được thiết kế theo cấu trúc Clean Architecture.
+Một URL Shortener service được xây dựng với Go và Clean Architecture, hỗ trợ tạo short URL, redirect và analytics.
 
-## Cấu trúc thư mục
+## 🛠️ Công nghệ sử dụng
 
+### **Backend**
+- **Go 1.23** - Programming language
+- **Gin** - HTTP web framework
+- **GORM** - ORM library
+- **SQLite** - Database (có thể chuyển sang PostgreSQL/MySQL)
+- **Redis** - Distributed locking và caching
+
+### **Infrastructure**
+- **Docker** - Containerization với multi-stage build
+- **Docker Compose** - Orchestration
+
+### **Architecture**
+- **Clean Architecture** - Separation of concerns
+- **Repository Pattern** - Data access abstraction
+- **Dependency Injection** - Loose coupling
+
+## ⚙️ Cấu hình ứng dụng
+
+### **Environment Variables**
+
+```bash
+# Server Configuration
+PORT=8080
+BASE_URL=http://localhost:8080
+GIN_MODE=release
+
+# Database Configuration
+DB_TYPE=sqlite
+DB_PATH=/app/data/url_shortener.db
+DB_MAX_OPEN_CONNS=100
+DB_MAX_IDLE_CONNS=50
+DB_CONN_MAX_LIFETIME=3600
+
+# Redis Configuration
+REDIS_URL=redis://localhost:6379
+REDIS_POOL_SIZE=100
+REDIS_MIN_IDLE_CONNS=20
+REDIS_MAX_RETRIES=3
+REDIS_DIAL_TIMEOUT=5
+REDIS_READ_TIMEOUT=3
+REDIS_WRITE_TIMEOUT=3
+REDIS_POOL_TIMEOUT=4
+
+# Lock Configuration
+LOCK_MAX_TIME=30
+LOCK_MAX_TRY_TIME=10
 ```
-url-shorted2/
-├── cmd/
-│   └── server/
-│       └── main.go                 # Entry point của ứng dụng
-├── internal/
-│   ├── domain/                     # Domain layer (entities, repositories)
-│   │   ├── entities/
-│   │   │   └── url.go             # URL entities
-│   │   └── repositories/
-│   │       └── url_repository.go  # URL repository interface
-│   ├── usecases/                   # Use case layer (business logic)
-│   │   └── url_usecase.go         # URL use case
-│   └── infrastructure/             # Infrastructure layer
-│       ├── handlers/
-│       │   └── url_handler.go     # HTTP handlers
-│       ├── repositories/
-│       │   └── url_repository_impl.go # Repository implementation
-│       ├── routes/
-│       │   └── routes.go          # Route definitions
-│       └── middleware/
-│           ├── cors.go            # CORS middleware
-│           └── logger.go          # Logger middleware
-├── tests/
-│   └── url_test.go                # Unit tests
-├── go.mod
-└── README.md
+
+### **Cách chạy**
+
+#### **1. Development Mode**
+```bash
+# Clone repository
+git clone <repository-url>
+cd url-shorted2
+
+# Install dependencies
+go mod tidy
+
+# Copy environment template
+cp env.example .env
+
+# Run application
+go run cmd/main.go
 ```
 
-## Clean Architecture Layers
+#### **2. Docker Mode**
+```bash
+# Build base image
+docker build -f Dockerfile.golang -t url-shortener:golang .
 
-### 1. Domain Layer (`internal/domain/`)
-- **Entities**: Chứa các business objects và data structures
-- **Repositories**: Định nghĩa interfaces cho data access
+# Build application image
+docker build -f Dockerfile -t url-shortener:latest .
 
-### 2. Use Case Layer (`internal/usecases/`)
-- Chứa business logic và use cases
-- Không phụ thuộc vào framework hay database
-- Chỉ phụ thuộc vào domain layer
+# Run with docker-compose (includes Redis)
+docker-compose up -d
+```
 
-### 3. Infrastructure Layer (`internal/infrastructure/`)
-- **Handlers**: HTTP request/response handling
-- **Repositories**: Implementation của domain repositories
-- **Routes**: Route definitions
-- **Middleware**: Cross-cutting concerns
+**Services sẽ chạy:**
+- URL Shortener: http://localhost:8080
+- Redis: localhost:6379
 
-## API Endpoints
+#### **3. Production Mode**
+```bash
+# Build optimized binary
+CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -ldflags '-w -s' -o main cmd/main.go
 
-### POST /api/v1/urls
-Tạo short URL mới.
+# Run with production config
+GIN_MODE=release ./main
+```
 
-**Request:**
+## 📡 API Documentation
+
+### **Base URL**
+```
+http://localhost:8080
+```
+
+### **1. Tạo Short URL**
+**POST** `/api/v1/urls`
+
+Tạo một short URL mới từ URL gốc. (Đã thêm distribute lock sử dụng redis để tránh trường hợp tạo short-link tạo ra link id trùng lặp)
+
+**Request Body:**
 ```json
 {
-  "url": "https://example.com",
-  "custom_code": "example",
-  "expires_in": 3600
+  "url": "https://example.com"
 }
 ```
 
 **Response:**
 ```json
 {
-  "short_code": "example",
-  "short_url": "http://localhost:8080/example",
+  "short_code": "abc123",
+  "short_url": "http://localhost:8080/abc123",
   "original_url": "https://example.com",
-  "expires_at": "2024-01-01T13:00:00Z",
   "created_at": "2024-01-01T12:00:00Z"
 }
 ```
 
-### GET /:shortCode
-Redirect đến original URL.
+**Example:**
+```bash
+curl -X POST http://localhost:8080/api/v1/urls \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com"}'
+```
+
+### **2. Redirect đến Original URL**
+**GET** `/{shortCode}`
+
+Redirect người dùng đến URL gốc và tăng click count.
 
 **Response:** HTTP 301 Redirect
 
-### GET /api/v1/urls/:shortCode
-Lấy thông tin URL.
+**Example:**
+```bash
+curl -I http://localhost:8080/abc123
+# Response: HTTP/1.1 301 Moved Permanently
+# Location: https://example.com
+```
+
+### **3. Lấy thông tin URL**
+**GET** `/api/v1/urls/{shortCode}`
+
+Lấy thông tin chi tiết của một short URL.
 
 **Response:**
 ```json
 {
-  "short_code": "example",
-  "original_url": "https://example.com"
+  "short_code": "abc123",
+  "original_url": "https://example.com",
+  "is_active": true,
+  "click_count": 42,
+  "created_at": "2024-01-01T12:00:00Z",
+  "updated_at": "2024-01-01T14:30:00Z"
 }
 ```
 
-### GET /api/v1/urls/:shortCode/stats
-Lấy thống kê URL.
+**Example:**
+```bash
+curl http://localhost:8080/api/v1/urls/abc123
+```
+
+### **4. Lấy thống kê URL**
+**GET** `/api/v1/urls/{shortCode}/stats`
+
+Lấy thống kê chi tiết và lịch sử click của URL.
 
 **Response:**
 ```json
 {
-  "short_code": "example",
+  "short_code": "abc123",
   "original_url": "https://example.com",
   "total_clicks": 42,
   "created_at": "2024-01-01T12:00:00Z",
   "last_clicked": "2024-01-01T14:30:00Z",
-  "click_history": [...]
+  "click_history": [
+    {
+      "ip_address": "192.168.1.1",
+      "user_agent": "Mozilla/5.0...",
+      "referer": "https://google.com",
+      "country": "VN",
+      "city": "Ho Chi Minh",
+      "clicked_at": "2024-01-01T14:30:00Z"
+    }
+  ]
 }
 ```
 
-### DELETE /api/v1/urls/:shortCode
-Xóa URL.
+**Example:**
+```bash
+curl http://localhost:8080/api/v1/urls/abc123/stats
+```
+
+### **5. Xóa URL**
+**DELETE** `/api/v1/urls/{shortCode}`
+
+Xóa một short URL (soft delete).
 
 **Response:**
 ```json
@@ -116,133 +210,109 @@ Xóa URL.
 }
 ```
 
-### GET /health
-Health check endpoint.
+**Example:**
+```bash
+curl -X DELETE http://localhost:8080/api/v1/urls/abc123
+```
+
+### **6. Health Check**
+**GET** `/health`
+
+Kiểm tra trạng thái sức khỏe của service.
 
 **Response:**
 ```json
 {
   "status": "ok",
-  "message": "Service is running"
+  "message": "Service is running",
+  "timestamp": "2024-01-01T12:00:00Z"
 }
 ```
 
-## Cách chạy
-
-### 1. Cài đặt dependencies
+**Example:**
 ```bash
-go mod tidy
-```
-
-### 2. Cấu hình Database (PostgreSQL)
-Ứng dụng sử dụng PostgreSQL làm database chính. Cấu hình thông qua environment variables:
-
-```bash
-# Database Configuration
-export DB_HOST=localhost
-export DB_PORT=5432
-export DB_USER=postgres
-export DB_PASSWORD=postgres
-export DB_NAME=url_shortener
-export DB_SSLMODE=disable
-
-# Server Configuration
-export PORT=8080
-export BASE_URL=http://localhost:8080
-export GIN_MODE=debug
-```
-
-Hoặc tạo file `.env` với nội dung tương tự.
-
-### 3. Khởi động PostgreSQL
-```bash
-# Sử dụng Docker
-docker run --name postgres-url-shortener \
-  -e POSTGRES_DB=url_shortener \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -p 5432:5432 \
-  -d postgres:15
-
-# Hoặc cài đặt PostgreSQL locally
-```
-
-### 4. Chạy server
-```bash
-go run cmd/main.go
-```
-
-Server sẽ chạy trên port 8080 và tự động migrate database schema.
-
-### 5. Test API
-```bash
-# Tạo short URL
-curl -X POST http://localhost:8080/api/v1/urls \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com"}'
-
-# Tạo short URL với custom code
-curl -X POST http://localhost:8080/api/v1/urls \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://google.com", "custom_code": "google"}'
-
-# Redirect (thay abc123 bằng short code thực tế)
-curl -I http://localhost:8080/abc123
-
-# Lấy thông tin URL
-curl http://localhost:8080/api/v1/urls/abc123
-
-# Lấy thống kê URL
-curl http://localhost:8080/api/v1/urls/abc123/stats
-
-# Xóa URL
-curl -X DELETE http://localhost:8080/api/v1/urls/abc123
-
-# Test health check
 curl http://localhost:8080/health
 ```
 
-### 6. Chạy tests
-```bash
-go test ./tests/...
+## 🔧 Error Handling
+
+### **Error Response Format**
+```json
+{
+  "error": "Error message",
+  "details": "Detailed error description",
+  "code": "ERROR_CODE",
+  "timestamp": "2024-01-01T12:00:00Z"
+}
 ```
 
-## Lợi ích của Clean Architecture
+### **Common Error Codes**
+- `INVALID_URL` - URL không hợp lệ
+- `URL_NOT_FOUND` - Short URL không tồn tại
+- `URL_INACTIVE` - URL đã bị vô hiệu hóa
+- `DATABASE_ERROR` - Lỗi database
+- `REDIS_ERROR` - Lỗi Redis connection
 
-1. **Separation of Concerns**: Mỗi layer có trách nhiệm riêng biệt
-2. **Dependency Inversion**: High-level modules không phụ thuộc vào low-level modules
-3. **Testability**: Dễ dàng viết unit tests cho từng layer
-4. **Maintainability**: Code dễ maintain và extend
-5. **Flexibility**: Có thể thay đổi implementation mà không ảnh hưởng business logic
+## 📊 Monitoring & Observability
 
-## Mở rộng
+### **Health Checks**
+- Application health endpoint (`/health`)
+- Database connectivity check
+- Redis connectivity check
 
-Để mở rộng ứng dụng, bạn có thể:
+### **Logging**
+- Structured logging với JSON format
+- Request/response logging
+- Error logging với stack trace
+- Performance metrics logging
 
-1. Thêm entities mới trong `internal/domain/entities/`
-2. Thêm repository interfaces trong `internal/domain/repositories/`
-3. Thêm use cases mới trong `internal/usecases/`
-4. Implement repositories trong `internal/infrastructure/repositories/`
-5. Thêm handlers mới trong `internal/infrastructure/handlers/`
-6. Thêm routes mới trong `internal/infrastructure/routes/`
+### **Metrics**
+- Request count và response time
+- Database connection pool status
+- Redis connection status
+- Click count per URL
+- Error rate
 
-## Dependencies
+## 🚀 Performance Features
 
-- **Gin**: HTTP web framework
-- **GORM**: ORM library
-- **PostgreSQL**: Database chính với driver postgres
-- **Testify**: Testing toolkit
-- **Go 1.21+**: Programming language
+- **Connection Pooling** - Database và Redis connection pooling
+- **Distributed Locking** - Redis-based locking cho concurrent access
+- **Static Binary** - Optimized Go binary với stripped symbols
+- **Health Checks** - Container health monitoring
+- **Caching** - Redis caching cho frequently accessed data
+- **Environment Configuration** - Flexible config management
 
-## Tính năng
+## 🧪 Testing
 
-- ✅ Tạo short URL với custom code
-- ✅ Redirect đến original URL
-- ✅ Analytics và click tracking
-- ✅ URL expiration
-- ✅ RESTful API
-- ✅ Database persistence
-- ✅ Clean Architecture
-- ✅ Unit tests
-- ✅ Error handling
-- ✅ CORS support
+```bash
+# Run unit tests
+go test ./internal/...
+
+# Run integration tests
+go test ./tests/...
+
+# Run tests with coverage
+go test ./... -cover
+
+# Run tests with race detection
+go test ./... -race
+```
+
+## 📁 Project Structure
+
+```
+url-shorted2/
+├── cmd/main.go                 # Application entry point
+├── internal/
+│   ├── config/                 # Configuration management
+│   ├── domain/                 # Domain entities và interfaces
+│   ├── usecases/               # Business logic
+│   ├── infrastructure/         # External concerns
+│   └── utils/                  # Utilities và helpers
+├── tests/                      # Integration tests
+├── scripts/                    # Build và deployment scripts
+├── Dockerfile.golang          # Base Docker image
+├── Dockerfile                 # Application Docker image
+├── docker-compose.yml         # Development environment
+└── env.example               # Environment template
+```

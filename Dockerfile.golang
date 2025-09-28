@@ -1,0 +1,26 @@
+# Base Dockerfile cho Go với các dependencies
+FROM golang:1.23-alpine AS base
+
+# Cài đặt các dependencies cần thiết trong một layer
+RUN apk add --no-cache \
+    git \
+    ca-certificates \
+    tzdata \
+    sqlite \
+    sqlite-dev \
+    gcc \
+    musl-dev \
+    make \
+    && rm -rf /var/cache/apk/*
+
+# Tạo user non-root để chạy ứng dụng
+RUN adduser -D -s /bin/sh appuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod files để cache dependencies (layer caching optimization)
+COPY go.mod go.sum ./
+
+# Download dependencies với cache optimization
+RUN go mod download && go mod verify

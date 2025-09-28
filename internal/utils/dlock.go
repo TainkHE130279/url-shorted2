@@ -2,9 +2,10 @@ package utils
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"errors"
 	"log"
-	"math/rand"
+	"math/big"
 	"strings"
 	"time"
 
@@ -49,7 +50,14 @@ var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01
 func randString(n int) string {
 	b := make([]rune, n)
 	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+		// Use crypto/rand for secure random number generation
+		num, err := cryptorand.Int(cryptorand.Reader, big.NewInt(int64(len(letterRunes))))
+		if err != nil {
+			// Fallback to uuid if crypto/rand fails
+			id, _ := uuid.NewRandom()
+			return strings.ReplaceAll(id.String(), "-", "")
+		}
+		b[i] = letterRunes[num.Int64()]
 	}
 	return string(b)
 }

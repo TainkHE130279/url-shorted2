@@ -2,9 +2,10 @@ package usecases
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"net/url"
 	"strings"
 	"time"
@@ -34,7 +35,7 @@ type urlUsecase struct {
 
 func NewURLUsecase(urlRepo repositories.IURLRepository, baseURL string, cfg *config.Config) IURLUsecase {
 	var locker utils.IDLock
-	
+
 	// Sử dụng mock lock trong test environment
 	if cfg.Server.GinMode == "test" {
 		locker = utils.NewMockLock()
@@ -53,7 +54,7 @@ func NewURLUsecase(urlRepo repositories.IURLRepository, baseURL string, cfg *con
 			MaxTryTime:  cfg.Lock.MaxTryTime,
 		})
 	}
-	
+
 	return &urlUsecase{
 		urlRepo: urlRepo,
 		baseURL: baseURL,
@@ -75,7 +76,11 @@ func (u *urlUsecase) CreateShortURL(req entities.CreateURLRequest) (*entities.Cr
 		return nil, err
 	}
 	// unlock key
-	defer u.locker.Unlock(context.TODO(), lrs)
+	defer func() {
+		if err := u.locker.Unlock(context.TODO(), lrs); err != nil {
+			fmt.Printf("Failed to unlock: %v\n", err)
+		}
+	}()
 	//get lastID for create short link
 	id, err := u.urlRepo.GetLastID()
 	if err != nil && err != gorm.ErrRecordNotFound {
@@ -153,7 +158,10 @@ func (u *urlUsecase) Redirect(shortCode string, ipAddress, userAgent, referer st
 	urlEntity, err := u.urlRepo.GetByShortCode(shortCode)
 	if err == nil {
 		analytics.URLID = urlEntity.ID
-		u.urlRepo.AddAnalytics(analytics)
+		if err := u.urlRepo.AddAnalytics(analytics); err != nil {
+			// Log error but don't fail the redirect
+			fmt.Printf("Failed to add analytics: %v\n", err)
+		}
 	}
 
 	return originalURL, nil
@@ -231,7 +239,12 @@ func (u *urlUsecase) generateShortCode() (string, error) {
 	for attempts := 0; attempts < 10; attempts++ {
 		code := make([]byte, codeLength)
 		for i := range code {
-			code[i] = charset[rand.Intn(len(charset))]
+			// Use crypto/rand for secure random number generation
+			n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+			if err != nil {
+				return "", fmt.Errorf("failed to generate random number: %w", err)
+			}
+			code[i] = charset[n.Int64()]
 		}
 		shortCode := string(code)
 

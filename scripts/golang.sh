@@ -1,0 +1,1 @@
+docker build -t url-shortener:golang -f Dockerfile.golang .

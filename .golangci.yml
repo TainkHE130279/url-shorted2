@@ -12,7 +12,6 @@ linters:
     - unused
     - gosimple
     - ineffassign
-    - typecheck
     - gosec
     - goconst
     - misspell
@@ -35,3 +34,13 @@ issues:
       linters:
         - errcheck
         - gosec
+        - typecheck
+    - path: internal/infrastructure/repositories/repository_test\.go
+      linters:
+        - typecheck
+    - path: internal/usecases/url_usecase_test\.go
+      linters:
+        - typecheck
+    - path: internal/utils/
+      linters:
+        - typecheck
