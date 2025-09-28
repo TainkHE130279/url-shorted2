@@ -130,3 +130,19 @@ func (rlock *redisLock) tryUnlock(ctx context.Context, ld *LockData) (bool, erro
 	}
 	return false, nil
 }
+
+// MockLock là mock implementation cho test
+type MockLock struct{}
+
+// NewMockLock tạo mock lock mới
+func NewMockLock() IDLock {
+	return &MockLock{}
+}
+
+func (m *MockLock) Lock(ctx context.Context, key string) (*LockData, error) {
+	return &LockData{Key: key, Value: "mock-lock"}, nil
+}
+
+func (m *MockLock) Unlock(ctx context.Context, ld *LockData) error {
+	return nil
+}

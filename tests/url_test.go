@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/url-shorted2/internal/config"
 	"github.com/url-shorted2/internal/domain/entities"
 	"github.com/url-shorted2/internal/infrastructure/handlers"
 	"github.com/url-shorted2/internal/infrastructure/repositories"
@@ -29,6 +30,38 @@ func setupTestDB() *gorm.DB {
 	return db
 }
 
+// getTestConfig tạo config cho test
+func getTestConfig() *config.Config {
+	return &config.Config{
+		Server: config.ServerConfig{
+			Port:    "8080",
+			BaseURL: "http://localhost:8080",
+			GinMode: "test",
+		},
+		Database: config.DatabaseConfig{
+			Type:             "sqlite",
+			Path:             ":memory:",
+			MaxOpenConns:     10,
+			MaxIdleConns:     5,
+			ConnMaxLifetime:  3600,
+		},
+		Redis: config.RedisConfig{
+			URL:            "redis://localhost:6379",
+			PoolSize:       10,
+			MinIdleConns:   5,
+			MaxRetries:     3,
+			DialTimeout:    5,
+			ReadTimeout:    3,
+			WriteTimeout:   3,
+			PoolTimeout:    4,
+		},
+		Lock: config.LockConfig{
+			MaxTime:    30,
+			MaxTryTime: 10,
+		},
+	}
+}
+
 func TestCreateShortURL(t *testing.T) {
 	// Setup
 	gin.SetMode(gin.TestMode)
@@ -36,7 +69,7 @@ func TestCreateShortURL(t *testing.T) {
 
 	// Khởi tạo dependencies
 	urlRepo := repositories.NewURLRepositoryImpl(db)
-	urlUsecase := usecases.NewURLUsecase(urlRepo, "http://localhost:8080")
+	urlUsecase := usecases.NewURLUsecase(urlRepo, "http://localhost:8080", getTestConfig())
 	urlHandler := handlers.NewURLHandler(urlUsecase)
 
 	// Tạo router
@@ -112,7 +145,7 @@ func TestRedirect(t *testing.T) {
 
 	// Khởi tạo dependencies
 	urlRepo := repositories.NewURLRepositoryImpl(db)
-	urlUsecase := usecases.NewURLUsecase(urlRepo, "http://localhost:8080")
+	urlUsecase := usecases.NewURLUsecase(urlRepo, "http://localhost:8080", getTestConfig())
 	urlHandler := handlers.NewURLHandler(urlUsecase)
 
 	// Tạo router
@@ -157,7 +190,7 @@ func TestGetURLStats(t *testing.T) {
 
 	// Khởi tạo dependencies
 	urlRepo := repositories.NewURLRepositoryImpl(db)
-	urlUsecase := usecases.NewURLUsecase(urlRepo, "http://localhost:8080")
+	urlUsecase := usecases.NewURLUsecase(urlRepo, "http://localhost:8080", getTestConfig())
 	urlHandler := handlers.NewURLHandler(urlUsecase)
 
 	// Tạo router

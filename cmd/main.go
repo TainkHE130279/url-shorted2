@@ -2,9 +2,8 @@ package main
 
 import (
 	"log"
-	"os"
-	"time"
 
+	"github.com/url-shorted2/internal/config"
 	"github.com/url-shorted2/internal/domain/entities"
 	"github.com/url-shorted2/internal/infrastructure/handlers"
 	"github.com/url-shorted2/internal/infrastructure/middleware"
@@ -18,6 +17,12 @@ import (
 )
 
 func main() {
+	// Load configuration
+	cfg := config.LoadConfig()
+	
+	// Set Gin mode
+	gin.SetMode(cfg.Server.GinMode)
+	
 	// Khởi tạo Gin router
 	router := gin.New()
 
@@ -27,7 +32,7 @@ func main() {
 	router.Use(middleware.CORSMiddleware())
 
 	// Khởi tạo database
-	db, err := initDatabase()
+	db, err := initDatabase(cfg)
 	if err != nil {
 		log.Fatal("Failed to initialize database:", err)
 	}
@@ -37,8 +42,7 @@ func main() {
 	urlRepo := repositories.NewURLRepositoryImpl(db)
 
 	// 2. Use case layer
-	baseURL := getBaseURL()
-	urlUsecase := usecases.NewURLUsecase(urlRepo, baseURL)
+	urlUsecase := usecases.NewURLUsecase(urlRepo, cfg.Server.BaseURL, cfg)
 
 	// 3. Infrastructure layer (handlers)
 	urlHandler := handlers.NewURLHandler(urlUsecase)
@@ -47,17 +51,16 @@ func main() {
 	routes.SetupRoutes(router, urlHandler)
 
 	// Khởi động server
-	port := getPort()
-	log.Printf("Server starting on port %s", port)
-	if err := router.Run(":" + port); err != nil {
+	log.Printf("Server starting on port %s", cfg.Server.Port)
+	if err := router.Run(":" + cfg.Server.Port); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
 }
 
 // initDatabase khởi tạo database và migrate schema
-func initDatabase() (*gorm.DB, error) {
+func initDatabase(cfg *config.Config) (*gorm.DB, error) {
 	// Sử dụng SQLite cho demo, có thể thay bằng PostgreSQL/MySQL
-	db, err := gorm.Open(sqlite.Open("url_shortener.db"), &gorm.Config{
+	db, err := gorm.Open(sqlite.Open(cfg.Database.Path), &gorm.Config{
 		// Tối ưu cho high concurrency
 		PrepareStmt: true, // Pre-compile statements
 	})
@@ -71,10 +74,10 @@ func initDatabase() (*gorm.DB, error) {
 		return nil, err
 	}
 
-	// Tối ưu connection pool
-	sqlDB.SetMaxOpenConns(100)          // Tăng số connection tối đa
-	sqlDB.SetMaxIdleConns(50)           // Tăng số connection idle
-	sqlDB.SetConnMaxLifetime(time.Hour) // Thời gian sống của connection
+	// Tối ưu connection pool từ config
+	sqlDB.SetMaxOpenConns(cfg.Database.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(cfg.Database.MaxIdleConns)
+	sqlDB.SetConnMaxLifetime(cfg.Database.ConnMaxLifetime)
 
 	// Auto migrate schema
 	err = db.AutoMigrate(
@@ -88,20 +91,3 @@ func initDatabase() (*gorm.DB, error) {
 	return db, nil
 }
 
-// getBaseURL lấy base URL từ environment variable
-func getBaseURL() string {
-	baseURL := os.Getenv("BASE_URL")
-	if baseURL == "" {
-		baseURL = "http://localhost:8080"
-	}
-	return baseURL
-}
-
-// getPort lấy port từ environment variable
-func getPort() string {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-	return port
-}

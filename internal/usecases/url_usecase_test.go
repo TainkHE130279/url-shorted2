@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/url-shorted2/internal/config"
 	"github.com/url-shorted2/internal/domain/entities"
 	"github.com/url-shorted2/internal/utils"
 
@@ -175,6 +176,7 @@ func TestURLUsecase_CreateShortURL(t *testing.T) {
 				urlRepo: mockRepo,
 				baseURL: "http://localhost:8080",
 				locker:  mockLock,
+				config:  getTestConfig(),
 			}
 
 			got, err := usecase.CreateShortURL(tt.req)
@@ -643,5 +645,37 @@ func TestURLUsecase_generateShortCode(t *testing.T) {
 
 			mockRepo.AssertExpectations(t)
 		})
+	}
+}
+
+// getTestConfig tạo config cho test
+func getTestConfig() *config.Config {
+	return &config.Config{
+		Server: config.ServerConfig{
+			Port:    "8080",
+			BaseURL: "http://localhost:8080",
+			GinMode: "test",
+		},
+		Database: config.DatabaseConfig{
+			Type:             "sqlite",
+			Path:             ":memory:",
+			MaxOpenConns:     10,
+			MaxIdleConns:     5,
+			ConnMaxLifetime:  time.Hour,
+		},
+		Redis: config.RedisConfig{
+			URL:            "redis://localhost:6379",
+			PoolSize:       10,
+			MinIdleConns:   5,
+			MaxRetries:     3,
+			DialTimeout:    5 * time.Second,
+			ReadTimeout:    3 * time.Second,
+			WriteTimeout:   3 * time.Second,
+			PoolTimeout:    4 * time.Second,
+		},
+		Lock: config.LockConfig{
+			MaxTime:    30 * time.Second,
+			MaxTryTime: 10 * time.Second,
+		},
 	}
 }

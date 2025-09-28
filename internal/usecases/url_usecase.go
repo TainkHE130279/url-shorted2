@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/url-shorted2/internal/config"
 	"github.com/url-shorted2/internal/domain/entities"
 	"github.com/url-shorted2/internal/domain/repositories"
 	"github.com/url-shorted2/internal/utils"
@@ -28,17 +29,36 @@ type urlUsecase struct {
 	urlRepo repositories.IURLRepository
 	baseURL string
 	locker  utils.IDLock
+	config  *config.Config
 }
 
-func NewURLUsecase(urlRepo repositories.IURLRepository, baseURL string) IURLUsecase {
-	locker := utils.NewRedisLock(utils.GetRedis(""), &utils.Config{
-		MaxLockTime: 30 * time.Second, // Tăng thời gian lock
-		MaxTryTime:  10 * time.Second, // Tăng thời gian retry
-	})
+func NewURLUsecase(urlRepo repositories.IURLRepository, baseURL string, cfg *config.Config) IURLUsecase {
+	var locker utils.IDLock
+	
+	// Sử dụng mock lock trong test environment
+	if cfg.Server.GinMode == "test" {
+		locker = utils.NewMockLock()
+	} else {
+		locker = utils.NewRedisLock(utils.GetRedisWithConfig(
+			cfg.Redis.URL,
+			cfg.Redis.PoolSize,
+			cfg.Redis.MinIdleConns,
+			cfg.Redis.MaxRetries,
+			cfg.Redis.DialTimeout,
+			cfg.Redis.ReadTimeout,
+			cfg.Redis.WriteTimeout,
+			cfg.Redis.PoolTimeout,
+		), &utils.Config{
+			MaxLockTime: cfg.Lock.MaxTime,
+			MaxTryTime:  cfg.Lock.MaxTryTime,
+		})
+	}
+	
 	return &urlUsecase{
 		urlRepo: urlRepo,
 		baseURL: baseURL,
 		locker:  locker,
+		config:  cfg,
 	}
 }
 
